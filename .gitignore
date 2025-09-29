@@ -1,3 +1,4 @@
 knowledge_docs/*
 !knowledge_docs/.gitkeep
 .env
+.ipynb_checkpoints
