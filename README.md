@@ -10,7 +10,7 @@ A Python-based RAG (Retrieval-Augmented Generation) chatbot designed to answer q
 
 ## Accessing Project Phases
 
-This project uses Git tags to mark the end of each development phase. You can check out the specific code for any phase using `git checkout <tag_name>`.
+This project uses Git tags to mark the end of each development phase.
 
 * **Phase 1 (`phase-1-cli`)**: The initial baseline version. 🌱
     * **Knowledge Source:** Loads text directly from `.docx` files located in a `knowledge_docs` directory.
