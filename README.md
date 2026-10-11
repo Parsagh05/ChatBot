@@ -1,39 +1,73 @@
-# Chatbot Project
+# Solar Panel Smart Chatbot
 
-This repository contains the code for a chatbot, developed across multiple phases, evolving from a simple keyword-based system to a more sophisticated RAG application with a web interface.
+Farsi-first RAG chatbot for solar product support. The backend uses FastAPI, ChromaDB, SQLite, and an OpenAI-compatible or Gemini LLM client. The frontend is a single RTL HTML chat UI.
 
-## Description
+## Current Inventory
 
-A Python-based RAG (Retrieval-Augmented Generation) chatbot designed to answer questions based on a provided knowledge base. It leverages vector embeddings for semantic search, integrates with OpenAI-compatible language models, and features a FastAPI backend with a web frontend. 🗣️ 🌐
+The app builds its product database from `knowledge_base/knowledge_base.json` at startup. In the current inventory there are 11 product chunks across these categories:
 
----
+- Solar panels
+- Off-grid inverters
+- Hybrid inverters
+- Solar lights
 
-## Accessing Project Phases
+Prices are not currently stored in the product JSON, so product cards show a contact-us price unless prices are added to the inventory/importer.
 
-This project uses Git tags to mark the end of each development phase.
+## Run Locally
 
-* **Phase 1 (`phase-1-cli`)**: The initial baseline version. 🌱
-    * **Knowledge Source:** Loads text directly from `.docx` files located in a `knowledge_docs` directory.
-    * **Chunking:** Splits documents into chunks based on blank lines (double newlines) within the `.docx` files.
-    * **Retrieval Method:** Implements a **naive keyword matching** strategy. It splits the query and chunks into words and finds the chunk with the highest number of overlapping words. Only the single best-matching chunk is used as context.
-    * **Response Generation:** Uses the `openai` library, configured to potentially connect to custom endpoints (like `api.metisai.ir`), to generate answers based on the retrieved chunk and the user's query. The prompt includes basic instructions for the LLM to act as a customer service assistant.
-    * **User Interface:** Interaction occurs directly within the `RAG_Chatbot.ipynb` Jupyter Notebook through an input loop.
-    * **Dependencies:** `openai`, `python-docx`, `python-dotenv`.
+Install dependencies:
 
-* **Phase 2 (`phase-2`)**: Enhanced retrieval, structured data, and CLI. 🚀
-    * **Knowledge Source:** Shifts to a structured `knowledge_base.json` file, where each entry contains a `chunk_id`, `chunk_text`, and associated `metadata` (like source title and URL).
-    * **Ingestion Pipeline:** Introduces a dedicated ingestion script (`Vector_Database_Ingestion.ipynb`). It uses `sentence-transformers` (`paraphrase-multilingual-mpnet-base-v2`) to generate vector embeddings for each chunk's text.
-    * **Vector Database:** Stores the embeddings, original text, and metadata persistently in a **`ChromaDB`** vector store located in the `./chroma_db` directory.
-    * **Retrieval Method:** Implements **semantic search**. Queries are embedded using the same `sentence-transformers` model, and `ChromaDB` retrieves the `n_results` (e.g., 10) most similar chunks based on vector distance.
-    * **Query Enhancement:** Adds an **LLM-based query correction/expansion** step (`expand_query`). It uses `gpt-4o-mini` (via `api.tapsage.com`) to correct spelling/grammar mistakes in the user's query. Retrieval is performed using *both* the original and corrected queries to broaden the search.
-    * **User Interface:** Provides a dedicated **Command-Line Interface (CLI)** application (`Chatbot_CLI_Application.ipynb`) for a more standard user interaction flow.
-    * **Dependencies:** `chromadb`, `sentence-transformers`, `openai`, `python-dotenv`.
+```powershell
+cd C:/Users/USER/Desktop/chatbot-main
+python -m pip install -r backend/requirements.txt
+```
 
-* **Phase 3 (`phase-3`)**: Backend API, Web UI, and Conversation History. ✨
-    * **Architecture:** Implements a client-server model.
-    * **Backend:** A **FastAPI** application (`backend/main.py`) serves the chatbot logic via an `/ask` REST API endpoint. It encapsulates the core chatbot functions within a `RAGChatbot` class (`backend/chatbot.py`). Uses Uvicorn for serving.
-    * **Frontend:** A simple **Web UI** (`frontend/index.html`) using HTML and vanilla JavaScript allows users to interact with the chatbot through their browser. It communicates with the FastAPI backend via `fetch` requests. Includes basic chat styling, message display, and a typing indicator.
-    * **Conversation Context:** Introduces **query rewriting** (`rewrite_query` in `backend/chatbot.py`). Before retrieval, the LLM reframes the user's latest question using the recent conversation history (last few turns) to make it a standalone, contextually complete query.
-    * **Ingestion Improvement:** The ingestion script (`ingest.ipynb`) now **enriches the text *before* embedding**. It prepends metadata (like source title and parent category) to the chunk text to potentially create more contextually rich embeddings for better retrieval, while still storing the original text in the database for display/generation.
-    * **Generation Enhancement:** The prompt sent to the LLM for the final answer now includes formatted context chunks *with their metadata* (source, URL) and the recent conversation history, allowing for more informed and potentially source-citing responses.
-    * **Dependencies:** Managed via `requirements.txt`, including `fastapi`, `uvicorn`, `chromadb`, `sentence-transformers`, `openai`, `python-dotenv`. CORS middleware is configured in FastAPI.
+Create or edit `backend/.env` from `backend/.env.example`, then start the backend:
+
+```powershell
+cd C:/Users/USER/Desktop/chatbot-main/backend
+python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
+```
+
+Start the frontend in a second terminal:
+
+```powershell
+cd C:/Users/USER/Desktop/chatbot-main/frontend
+python -m http.server 8080
+```
+
+Open `http://localhost:8080`.
+
+## Configuration
+
+| Variable | Description |
+| --- | --- |
+| `OPENAI_API_KEY` | OpenAI-compatible API key. Also used as Gemini fallback if `GEMINI_API_KEY` is empty. |
+| `OPENAI_BASE_URL` | OpenAI-compatible endpoint, for example TapSage or OpenAI. |
+| `GEMINI_API_KEY` | Gemini API key, used when `LLM_MODEL` starts with `gemini`. |
+| `GEMINI_API_ENDPOINT` | Gemini endpoint override. Keep this matched to your provider. |
+| `LLM_MODEL` | Model name, for example `gpt-4o-mini` or a `gemini...` model. |
+| `CHROMA_DB_PATH` | Persistent ChromaDB path, relative to `backend/` by default. |
+| `KNOWLEDGE_BASE_DIR` | Folder containing `knowledge_base.json` and `QA.json`. |
+| `PRODUCT_DB_PATH` | SQLite product/feedback database path. |
+| `CORS_ORIGINS` | Comma-separated frontend origins. |
+
+## API Endpoints
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `POST` | `/ask` | Main chat endpoint. |
+| `GET` | `/suggestions` | Suggested startup questions from `QA.json`. |
+| `POST` | `/feedback` | Save thumbs up/down feedback. |
+| `GET` | `/products/search?q=...` | Search products. |
+| `GET` | `/products/categories` | List product categories. |
+| `GET` | `/products/category/{id}` | Products in one category. |
+| `GET` | `/products/{id}` | Product details. |
+| `GET` | `/health` | Backend health check. |
+
+## Notes
+
+- The frontend keeps only shallow in-memory conversation history and sends it with each `/ask` request.
+- The backend does not persist full chat history by session ID.
+- If the product database looks stale after changing JSON import logic, delete `backend/products.db` or call the importer with `force=True`.
+- The frontend request timeout is 60 seconds; slow or hung LLM calls show a timeout message instead of leaving typing forever.

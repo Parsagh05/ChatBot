@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.eggs/
+.agents/
+
+# Virtual environment
+venv/
+.venv/
+env/
+
+# Environment variables
+.env
+backend/.env
+
+# Database files
+*.db
+chroma_db/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Local data and logs (not published)
+knowledge_base/
+*.log
