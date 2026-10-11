@@ -1,4 +1,4 @@
-"""Product database management using SQLite and the JSON knowledge base."""
+"""Product database management using SQLite, filled from the website snapshot."""
 
 import hashlib
 import json
@@ -11,9 +11,6 @@ from typing import Any, Dict, List, Optional
 from config import settings
 
 logger = logging.getLogger(__name__)
-
-
-PRODUCT_PREFIX = "product_"
 
 
 def get_connection() -> sqlite3.Connection:
@@ -140,24 +137,14 @@ def _ensure_column(cursor: sqlite3.Cursor, table: str, column: str, column_type:
         cursor.execute(f"ALTER TABLE {table} ADD COLUMN {column} {column_type}")
 
 
-def seed_sample_data() -> None:
-    """Backward-compatible alias for the old hardcoded seeder."""
-    import_products_from_knowledge_base()
-
-
-def import_products_from_knowledge_base(force: bool = False) -> int:
-    """Import product rows from knowledge_base.json into SQLite."""
-    knowledge_path = Path(settings.KNOWLEDGE_BASE_DIR) / "knowledge_base.json"
-    if not knowledge_path.exists():
-        logger.warning("Product import skipped; missing %s", knowledge_path)
-        return 0
-
-    raw_json = knowledge_path.read_text(encoding="utf-8")
+def import_products(products: List[Dict[str, Any]], force: bool = False) -> int:
+    """Replace the product tables with the products from the website snapshot."""
+    raw_json = json.dumps(products, ensure_ascii=False, sort_keys=True)
     source_hash = hashlib.sha256(raw_json.encode("utf-8")).hexdigest()
     conn = get_connection()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT source_hash FROM import_state WHERE source = ?", ("knowledge_base_products",))
+    cursor.execute("SELECT source_hash FROM import_state WHERE source = ?", ("site_products",))
     row = cursor.fetchone()
     if row and row["source_hash"] == source_hash and not force:
         cursor.execute("SELECT COUNT(*) FROM products")
@@ -165,17 +152,13 @@ def import_products_from_knowledge_base(force: bool = False) -> int:
         conn.close()
         return count
 
-    data = json.loads(raw_json)
-    products = [_product_from_chunk(item) for item in data if _is_product_chunk(item)]
-    products = [product for product in products if product]
-
     cursor.execute("DELETE FROM products")
     cursor.execute("DELETE FROM categories")
     cursor.execute("DELETE FROM products_fts")
 
     category_ids: Dict[str, int] = {}
     for product in products:
-        category_name = product["category_name_fa"]
+        category_name = (product.get("categories") or ["محصولات"])[0]
         if category_name not in category_ids:
             cursor.execute(
                 """
@@ -186,6 +169,7 @@ def import_products_from_knowledge_base(force: bool = False) -> int:
             )
             category_ids[category_name] = int(cursor.lastrowid)
 
+        description = "\n".join(part for part in (product.get("short_description"), product.get("description")) if part)
         cursor.execute(
             """
             INSERT INTO products (
@@ -195,18 +179,18 @@ def import_products_from_knowledge_base(force: bool = False) -> int:
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                product["source_chunk_id"],
-                product["source_url"],
+                f"site:{product['id']}",
+                product.get("url", ""),
+                _latin_name(product["name"]) or product["name"],
                 product["name"],
-                product["name_fa"],
                 category_ids[category_name],
-                product["description"],
-                product["description_fa"],
-                product["price"],
-                product["currency"],
-                product["in_stock"],
-                json.dumps(product["specifications"], ensure_ascii=False),
-                product["image_url"],
+                description,
+                description,
+                product.get("price"),
+                product.get("currency") or "تومان",
+                1 if product.get("in_stock", True) else 0,
+                json.dumps(_extract_specifications(product, category_name), ensure_ascii=False),
+                product.get("image_url"),
             ),
         )
 
@@ -218,41 +202,13 @@ def import_products_from_knowledge_base(force: bool = False) -> int:
             source_hash = excluded.source_hash,
             imported_at = CURRENT_TIMESTAMP
         """,
-        ("knowledge_base_products", source_hash),
+        ("site_products", source_hash),
     )
 
     conn.commit()
     conn.close()
-    logger.info("Imported %s products from %s", len(products), knowledge_path)
+    logger.info("Imported %s products from the website snapshot", len(products))
     return len(products)
-
-
-def _is_product_chunk(item: Dict[str, Any]) -> bool:
-    chunk_id = str(item.get("chunk_id", ""))
-    return chunk_id.startswith(PRODUCT_PREFIX)
-
-
-def _product_from_chunk(item: Dict[str, Any]) -> Dict[str, Any]:
-    metadata = item.get("metadata") or {}
-    title = str(metadata.get("source_title") or "").strip()
-    text = str(item.get("chunk_text") or "").strip()
-    category = str(metadata.get("parent_category") or "محصولات").strip()
-    source_url = str(metadata.get("source_url") or "").strip()
-
-    return {
-        "source_chunk_id": str(item.get("chunk_id") or title),
-        "source_url": source_url,
-        "name": _latin_name(title) or title,
-        "name_fa": title,
-        "category_name_fa": category,
-        "description": text,
-        "description_fa": text,
-        "price": None,
-        "currency": "تومان",
-        "in_stock": 1,
-        "specifications": _extract_specifications(text, title, category, source_url),
-        "image_url": None,
-    }
 
 
 def _latin_name(title: str) -> str:
@@ -260,24 +216,19 @@ def _latin_name(title: str) -> str:
     return " ".join(part.strip() for part in parts if part.strip())
 
 
-def _extract_specifications(text: str, title: str, category: str, source_url: str) -> Dict[str, str]:
-    specs: Dict[str, str] = {
-        "عنوان": title,
-        "دسته‌بندی": category,
-    }
-    if source_url:
-        specs["لینک منبع"] = source_url
+def _extract_specifications(product: Dict[str, Any], category: str) -> Dict[str, str]:
+    specs: Dict[str, str] = {"عنوان": product["name"], "دسته‌بندی": category}
+    specs.update(product.get("attributes") or {})
 
-    for line in text.splitlines():
-        line = line.strip()
-        if not line.startswith("-") or ":" not in line:
+    # descriptions on the site are written as "key : value" lines
+    for line in (product.get("description") or "").splitlines():
+        line = line.strip().lstrip("-•").strip()
+        if ":" not in line:
             continue
-        key, value = line.lstrip("-").split(":", 1)
-        key = key.strip()
-        value = value.strip()
-        if key and value:
+        key, value = line.split(":", 1)
+        key, value = key.strip(), value.strip()
+        if key and value and len(key) <= 40:
             specs[key] = value
-
     return specs
 
 
@@ -383,6 +334,14 @@ def get_products_by_category(category_id: int) -> List[Dict[str, Any]]:
     return [_row_to_product(row) for row in rows]
 
 
+def count_products() -> int:
+    conn = get_connection()
+    try:
+        return int(conn.execute("SELECT COUNT(*) FROM products").fetchone()[0])
+    finally:
+        conn.close()
+
+
 def get_all_categories() -> List[Dict[str, Any]]:
     """Get all product categories."""
     conn = get_connection()
@@ -417,6 +376,25 @@ def _row_to_product(row: sqlite3.Row) -> Dict[str, Any]:
         product["specifications"] = json.loads(product["specifications"])
     product["in_stock"] = bool(product.get("in_stock"))
     return product
+
+
+def list_feedback(rating: Optional[str] = None, limit: int = 50, offset: int = 0) -> Dict[str, Any]:
+    """Newest feedback first. rating: None (all), 'down' (1-2) or 'up' (4-5)."""
+    where = {"down": "WHERE rating <= 2", "up": "WHERE rating >= 4"}.get(rating or "", "")
+    conn = get_connection()
+    try:
+        rows = conn.execute(
+            f"SELECT id, session_id, question, answer, rating, comment, created_at FROM feedback {where} "
+            "ORDER BY id DESC LIMIT ? OFFSET ?",
+            (limit, offset),
+        ).fetchall()
+        stats = conn.execute(
+            "SELECT COUNT(*) AS total, COALESCE(SUM(rating >= 4), 0) AS up, COALESCE(SUM(rating <= 2), 0) AS down FROM feedback"
+        ).fetchone()
+        matching = conn.execute(f"SELECT COUNT(*) FROM feedback {where}").fetchone()[0]
+    finally:
+        conn.close()
+    return {"items": [dict(row) for row in rows], "matching": int(matching), "stats": dict(stats)}
 
 
 def save_feedback(session_id: str, question: str, answer: str, rating: int, comment: str = "") -> bool:

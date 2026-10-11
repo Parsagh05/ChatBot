@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements*.txt
+      - name: Install dependencies
+        run: |
+          pip install --index-url https://download.pytorch.org/whl/cpu torch
+          pip install -r backend/requirements-dev.txt
+      - name: Run tests
+        working-directory: backend
+        run: python -m pytest -q
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate compose file
+        run: |
+          cp backend/.env.example backend/.env
+          docker compose config --quiet
+      - name: Validate nginx config
+        run: |
+          docker run --rm --add-host backend:127.0.0.1 \
+            -v "$PWD/deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro" \
+            -v "$PWD/deploy/config.docker.js:/etc/nginx/chatbot/config.js:ro" \
+            nginx:1.27-alpine nginx -t
+      - name: Build backend image
+        run: docker build -t chatbot-backend .
+      - name: Smoke test image
+        run: docker run --rm chatbot-backend python -c "import main; print('backend imports OK')"

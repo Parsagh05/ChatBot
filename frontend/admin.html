@@ -1,0 +1,620 @@
+<!-- frontend/admin.html -->
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>پنل مدیریت | Admin</title>
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #4a6cf7;
+            --primary-hover: #3a5bd0;
+            --primary-light: rgba(74, 108, 247, 0.1);
+            --bg: #0f0f0f;
+            --bg-card: #1a1a1a;
+            --bg-input: #252525;
+            --text: #e8e8e8;
+            --text-muted: #888;
+            --border: #2a2a2a;
+            --success: #4caf50;
+            --warning: #ff9800;
+            --danger: #f44336;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Vazirmatn', Tahoma, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 24px 16px;
+        }
+
+        .wrap { max-width: 980px; margin: 0 auto; }
+
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        header h1 { font-size: 1.25rem; font-weight: 600; }
+        header p { font-size: 0.8rem; color: var(--text-muted); margin-top: 2px; }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 16px;
+        }
+
+        .card h2 { font-size: 1rem; font-weight: 600; margin-bottom: 4px; }
+        .card .hint { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 16px; line-height: 1.7; }
+
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+        }
+
+        .stat {
+            background: var(--bg-input);
+            border-radius: 12px;
+            padding: 14px;
+            border: 1px solid var(--border);
+        }
+
+        .stat .label { font-size: 0.75rem; color: var(--text-muted); }
+        .stat .value { font-size: 1.05rem; font-weight: 600; margin-top: 4px; word-break: break-word; }
+        .stat .sub { font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; line-height: 1.6; word-break: break-word; }
+
+        .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-left: 6px; }
+        .dot.ok { background: var(--success); }
+        .dot.bad { background: var(--danger); }
+        .dot.busy { background: var(--warning); animation: pulse 1.2s infinite; }
+
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+        .fields {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 14px 16px;
+        }
+
+        .field label { display: block; font-size: 0.85rem; margin-bottom: 6px; }
+        .field label code {
+            font-family: Consolas, monospace;
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            margin-right: 6px;
+            direction: ltr;
+            unicode-bidi: isolate;
+        }
+
+        .field small { display: block; font-size: 0.72rem; color: var(--text-muted); margin-top: 5px; line-height: 1.6; }
+
+        input, select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            background: var(--bg-input);
+            color: var(--text);
+            font-family: inherit;
+            font-size: 0.9rem;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        input:focus, select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(74, 108, 247, 0.15); }
+        input.ltr { direction: ltr; text-align: left; }
+        input.changed, select.changed { border-color: var(--warning); }
+
+        .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; align-items: center; }
+
+        button {
+            border: none;
+            border-radius: 10px;
+            padding: 10px 18px;
+            font-family: inherit;
+            font-size: 0.88rem;
+            cursor: pointer;
+            transition: background 0.2s, opacity 0.2s;
+        }
+
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover:not(:disabled) { background: var(--primary-hover); }
+        .btn-ghost { background: rgba(255, 255, 255, 0.08); color: var(--text); }
+        .btn-ghost:hover:not(:disabled) { background: rgba(255, 255, 255, 0.15); }
+
+        .notice { font-size: 0.82rem; line-height: 1.7; padding: 10px 14px; border-radius: 10px; margin-top: 14px; display: none; }
+        .notice.show { display: block; }
+        .notice.ok { background: rgba(76, 175, 80, 0.12); color: #9be29f; }
+        .notice.err { background: rgba(244, 67, 54, 0.12); color: #ff9a92; }
+        .notice.info { background: var(--primary-light); color: #aebfff; }
+
+        .filter-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 14px; }
+        .filter-bar button.active { background: var(--primary); color: white; }
+        .feedback-stats { font-size: 0.8rem; color: var(--text-muted); margin-right: auto; }
+
+        .feedback-item {
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 12px 14px;
+            margin-bottom: 10px;
+            background: var(--bg-input);
+        }
+
+        .feedback-item.down { border-right: 3px solid var(--danger); }
+        .feedback-item.up { border-right: 3px solid var(--success); }
+        .feedback-meta { display: flex; justify-content: space-between; gap: 8px; font-size: 0.72rem; color: var(--text-muted); margin-bottom: 6px; }
+        .feedback-question { font-size: 0.9rem; font-weight: 600; line-height: 1.7; white-space: pre-wrap; }
+        .feedback-item details { margin-top: 6px; font-size: 0.82rem; }
+        .feedback-item summary { cursor: pointer; color: #8ea6ff; }
+        .feedback-answer { white-space: pre-wrap; line-height: 1.8; margin-top: 6px; color: #cfcfcf; max-height: 320px; overflow-y: auto; }
+        .feedback-comment { font-size: 0.8rem; margin-top: 6px; color: var(--warning); }
+        .empty { font-size: 0.85rem; color: var(--text-muted); padding: 12px 0; }
+
+        #login-view { max-width: 380px; margin: 12vh auto 0; }
+        #login-view h1 { font-size: 1.15rem; margin-bottom: 6px; }
+        #app-view { display: none; }
+
+        @media (max-width: 600px) {
+            body { padding: 16px; }
+            header { flex-direction: column; align-items: flex-start; }
+        }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <!-- Login -->
+        <div id="login-view" class="card">
+            <h1>🔐 ورود به پنل مدیریت</h1>
+            <p class="hint">رمز عبور مقدار <code>ADMIN_PASSWORD</code> در فایل <code>backend/.env</code> است.</p>
+            <form id="login-form">
+                <div class="field">
+                    <label for="password">رمز عبور</label>
+                    <input type="password" id="password" autocomplete="current-password" required>
+                </div>
+                <div class="actions"><button class="btn-primary" type="submit">ورود</button></div>
+                <div class="notice err" id="login-error"></div>
+            </form>
+        </div>
+
+        <!-- Dashboard -->
+        <div id="app-view">
+            <header>
+                <div>
+                    <h1>⚙️ پنل مدیریت چت‌بات</h1>
+                    <p>تنظیمات مدل‌ها، کلیدها، پایگاه دانش و پارامترهای بازیابی — بدون تغییر کد</p>
+                </div>
+                <div class="actions" style="margin-top:0">
+                    <a href="index.html" class="btn-ghost" style="text-decoration:none;padding:10px 18px;border-radius:10px;font-size:0.88rem;color:var(--text)">💬 صفحه چت</a>
+                    <button class="btn-ghost" id="logout-btn">خروج</button>
+                </div>
+            </header>
+
+            <!-- Status -->
+            <section class="card">
+                <h2>وضعیت سیستم</h2>
+                <p class="hint">هر چند ثانیه به‌روز می‌شود.</p>
+                <div class="status-grid" id="status-grid"></div>
+            </section>
+
+            <!-- Feedback -->
+            <section class="card">
+                <h2>💬 بازخورد کاربران</h2>
+                <p class="hint">پاسخ‌هایی که کاربران با 👍 یا 👎 ارزیابی کرده‌اند. پاسخ‌های 👎 نشان می‌دهند کجا پایگاه دانش یا تنظیمات نیاز به بهبود دارد.</p>
+                <div class="filter-bar">
+                    <button type="button" class="btn-ghost active" data-rating="">همه</button>
+                    <button type="button" class="btn-ghost" data-rating="down">👎 ناراضی</button>
+                    <button type="button" class="btn-ghost" data-rating="up">👍 راضی</button>
+                    <span class="feedback-stats" id="feedback-stats"></span>
+                    <button type="button" class="btn-ghost" id="feedback-refresh">🔄</button>
+                </div>
+                <div id="feedback-list"></div>
+                <div class="actions"><button type="button" class="btn-ghost" id="feedback-more" style="display:none">بیشتر</button></div>
+            </section>
+
+            <form id="settings-form">
+                <!-- Credentials & models -->
+                <section class="card">
+                    <h2>🔑 کلیدها و مدل‌ها</h2>
+                    <p class="hint">کلیدها هرگز به مرورگر برگردانده نمی‌شوند؛ برای تغییر، مقدار جدید را وارد کنید. خالی گذاشتن یعنی «بدون تغییر».</p>
+                    <div class="fields">
+                        <div class="field">
+                            <label>ارائه‌دهنده مدل زبانی <code>LLM_PROVIDER</code></label>
+                            <select name="LLM_PROVIDER">
+                                <option value="auto">خودکار (از روی نام مدل)</option>
+                                <option value="openai">سازگار با OpenAI</option>
+                                <option value="gemini">Gemini</option>
+                            </select>
+                            <small>«خودکار»: مدل‌هایی که با gemini شروع می‌شوند از Gemini، بقیه از OpenAI.</small>
+                        </div>
+                        <div class="field">
+                            <label>مدل زبانی <code>LLM_MODEL</code></label>
+                            <input name="LLM_MODEL" class="ltr" list="llm-models">
+                            <datalist id="llm-models">
+                                <option value="gpt-4o-mini"></option>
+                                <option value="gpt-4o"></option>
+                                <option value="gemini-2.5-flash"></option>
+                            </datalist>
+                        </div>
+                        <div class="field">
+                            <label>کلید OpenAI <code>OPENAI_API_KEY</code></label>
+                            <input name="OPENAI_API_KEY" type="password" class="ltr" autocomplete="off" data-secret>
+                            <small data-secret-hint="OPENAI_API_KEY"></small>
+                        </div>
+                        <div class="field">
+                            <label>آدرس API سازگار با OpenAI <code>OPENAI_BASE_URL</code></label>
+                            <input name="OPENAI_BASE_URL" class="ltr" placeholder="https://api.openai.com/v1">
+                        </div>
+                        <div class="field">
+                            <label>کلید Gemini <code>GEMINI_API_KEY</code></label>
+                            <input name="GEMINI_API_KEY" type="password" class="ltr" autocomplete="off" data-secret>
+                            <small data-secret-hint="GEMINI_API_KEY"></small>
+                        </div>
+                        <div class="field">
+                            <label>آدرس API جمینای <code>GEMINI_API_ENDPOINT</code></label>
+                            <input name="GEMINI_API_ENDPOINT" class="ltr">
+                        </div>
+                        <div class="field">
+                            <label>مدل embedding <code>EMBEDDING_MODEL</code></label>
+                            <input name="EMBEDDING_MODEL" class="ltr" list="embedding-models">
+                            <datalist id="embedding-models">
+                                <option value="paraphrase-multilingual-mpnet-base-v2"></option>
+                                <option value="paraphrase-multilingual-MiniLM-L12-v2"></option>
+                                <option value="BAAI/bge-m3"></option>
+                            </datalist>
+                            <small>⚠️ تغییر آن، ایندکس را دوباره می‌سازد (مدل جدید یک بار دانلود می‌شود).</small>
+                        </div>
+                    </div>
+                    <div class="actions">
+                        <button type="button" class="btn-ghost" id="test-llm-btn">🧪 تست اتصال مدل زبانی</button>
+                    </div>
+                    <div class="notice" id="test-llm-result"></div>
+                </section>
+
+                <!-- Retrieval & generation -->
+                <section class="card">
+                    <h2>🎛️ پارامترهای بازیابی و تولید پاسخ</h2>
+                    <p class="hint">تغییر اندازه یا هم‌پوشانی بخش‌ها، ایندکس را در پس‌زمینه دوباره می‌سازد؛ تا آماده شدن، ایندکس قبلی پاسخ می‌دهد.</p>
+                    <div class="fields">
+                        <div class="field">
+                            <label>اندازه هر بخش (کاراکتر) <code>CHUNK_SIZE</code></label>
+                            <input name="CHUNK_SIZE" type="number" min="200" max="4000" step="50">
+                            <small>۲۰۰ تا ۴۰۰۰. بزرگ‌تر = زمینه بیشتر در هر بخش، دقت کمتر در جستجو.</small>
+                        </div>
+                        <div class="field">
+                            <label>هم‌پوشانی بخش‌ها (کاراکتر) <code>CHUNK_OVERLAP</code></label>
+                            <input name="CHUNK_OVERLAP" type="number" min="0" max="1000" step="10">
+                            <small>باید کمتر از نصف اندازه بخش باشد.</small>
+                        </div>
+                        <div class="field">
+                            <label>تعداد بخش‌های بازیابی‌شده <code>TOP_K</code></label>
+                            <input name="TOP_K" type="number" min="1" max="20">
+                            <small>۱ تا ۲۰ بخش مرتبط که به مدل داده می‌شود.</small>
+                        </div>
+                        <div class="field">
+                            <label>دما (خلاقیت) <code>TEMPERATURE</code></label>
+                            <input name="TEMPERATURE" type="number" min="0" max="2" step="0.05">
+                            <small>۰ = دقیق و ثابت، ۱ به بالا = خلاقانه‌تر.</small>
+                        </div>
+                        <div class="field">
+                            <label>حداکثر طول پاسخ (توکن) <code>MAX_TOKENS</code></label>
+                            <input name="MAX_TOKENS" type="number" min="64" max="8192" step="50">
+                        </div>
+                        <div class="field">
+                            <label>محدودیت درخواست هر کاربر در دقیقه <code>RATE_LIMIT_PER_MINUTE</code></label>
+                            <input name="RATE_LIMIT_PER_MINUTE" type="number" min="1" max="1000">
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Knowledge sources -->
+                <section class="card">
+                    <h2>📚 منابع دانش</h2>
+                    <p class="hint">
+                        پایگاه دانش از سه منبع ساخته می‌شود: همه صفحات، مطالب و محصولات وب‌سایت، اسناد پوشه <code>knowledge_base/raw_docs</code> (docx، pdf، txt، md) و پرسش‌های متداول <code>QA.json</code>.
+                        برای افزودن سند، فایل را در پوشه raw_docs قرار دهید و «بازسازی ایندکس» را بزنید.
+                    </p>
+                    <div class="fields">
+                        <div class="field">
+                            <label>آدرس وب‌سایت <code>SITE_URL</code></label>
+                            <input name="SITE_URL" class="ltr">
+                            <small>پس از تغییر، «همگام‌سازی وب‌سایت» را بزنید.</small>
+                        </div>
+                    </div>
+                    <div class="actions">
+                        <button type="button" class="btn-ghost" id="sync-btn">🌐 همگام‌سازی وب‌سایت</button>
+                        <button type="button" class="btn-ghost" id="reindex-btn">🔄 بازسازی ایندکس</button>
+                    </div>
+                    <div class="notice" id="job-notice"></div>
+                </section>
+
+                <div class="card" style="position:sticky;bottom:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+                    <button type="submit" class="btn-primary" id="save-btn">💾 ذخیره تغییرات</button>
+                    <button type="button" class="btn-ghost" id="reset-btn">بازگردانی</button>
+                    <span id="dirty-count" style="font-size:0.8rem;color:var(--text-muted)"></span>
+                    <div class="notice" id="save-result" style="margin-top:0;flex-basis:100%"></div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="config.js"></script>
+    <script>
+        const API_URL = window.CHATBOT_API_URL || "http://localhost:8000";
+        const NUMBER_FIELDS = new Set(["CHUNK_SIZE", "CHUNK_OVERLAP", "TOP_K", "TEMPERATURE", "MAX_TOKENS", "RATE_LIMIT_PER_MINUTE"]);
+        const TYPE_LABELS = { page: "صفحه", post: "مطلب", product: "محصول", document: "سند", faq: "پرسش متداول" };
+        let token = null;
+        let loaded = {};
+        let pollTimer = null;
+        let lastJobStatus = null;
+
+        try { token = sessionStorage.getItem("admin_token"); } catch (e) { token = null; }
+
+        const form = document.getElementById("settings-form");
+        const fieldsOf = () => [...form.querySelectorAll("input[name], select[name]")];
+
+        function escapeHtml(value) {
+            return String(value ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+        }
+
+        function showNotice(id, kind, text) {
+            const el = document.getElementById(id);
+            el.className = `notice show ${kind}`;
+            el.textContent = text;
+        }
+
+        async function api(path, options = {}) {
+            const response = await fetch(`${API_URL}${path}`, {
+                ...options,
+                headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(options.headers || {}) },
+            });
+            if (response.status === 401 && path !== "/admin/login") {
+                logoutLocal();
+                throw new Error("نشست شما منقضی شد. دوباره وارد شوید.");
+            }
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(data.detail || `HTTP ${response.status}`);
+            return data;
+        }
+
+        // ─── Auth ──────────────────────────────────────────────────────────
+
+        document.getElementById("login-form").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            try {
+                const data = await api("/admin/login", { method: "POST", body: JSON.stringify({ password: document.getElementById("password").value }) });
+                token = data.token;
+                try { sessionStorage.setItem("admin_token", token); } catch (err) { /* private mode */ }
+                document.getElementById("password").value = "";
+                start();
+            } catch (err) {
+                showNotice("login-error", "err", err.message === "Failed to fetch" ? "اتصال به سرور برقرار نشد." : err.message);
+            }
+        });
+
+        document.getElementById("logout-btn").addEventListener("click", async () => {
+            try { await api("/admin/logout", { method: "POST" }); } catch (e) { /* already logged out */ }
+            logoutLocal();
+        });
+
+        function logoutLocal() {
+            token = null;
+            try { sessionStorage.removeItem("admin_token"); } catch (e) { /* ignore */ }
+            clearTimeout(pollTimer);
+            document.getElementById("app-view").style.display = "none";
+            document.getElementById("login-view").style.display = "block";
+        }
+
+        // ─── Settings ──────────────────────────────────────────────────────
+
+        async function loadSettings() {
+            const { settings } = await api("/admin/settings");
+            loaded = settings;
+            for (const input of fieldsOf()) {
+                const value = settings[input.name];
+                if (input.hasAttribute("data-secret")) {
+                    input.value = "";
+                    input.placeholder = value && value.set ? `ذخیره شده ${value.hint || ""}` : "تنظیم نشده";
+                    const hint = form.querySelector(`[data-secret-hint="${input.name}"]`);
+                    if (hint) hint.textContent = value && value.set ? "✓ کلید ذخیره شده است." : "⚠️ کلیدی تنظیم نشده است.";
+                } else {
+                    input.value = value ?? "";
+                }
+                input.classList.remove("changed");
+            }
+            updateDirty();
+        }
+
+        function collectChanges() {
+            const changes = {};
+            for (const input of fieldsOf()) {
+                if (input.hasAttribute("data-secret")) {
+                    if (input.value.trim()) changes[input.name] = input.value.trim();
+                    continue;
+                }
+                const original = loaded[input.name];
+                const value = NUMBER_FIELDS.has(input.name) ? Number(input.value) : input.value.trim();
+                if (String(value) !== String(original)) changes[input.name] = value;
+            }
+            return changes;
+        }
+
+        function updateDirty() {
+            const changes = collectChanges();
+            for (const input of fieldsOf()) input.classList.toggle("changed", input.name in changes);
+            const count = Object.keys(changes).length;
+            document.getElementById("dirty-count").textContent = count ? `${count.toLocaleString("fa-IR")} تغییر ذخیره نشده` : "";
+            document.getElementById("save-btn").disabled = count === 0;
+        }
+
+        form.addEventListener("input", updateDirty);
+        form.addEventListener("change", updateDirty);
+        document.getElementById("reset-btn").addEventListener("click", () => loadSettings().catch(err => showNotice("save-result", "err", err.message)));
+
+        form.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const changes = collectChanges();
+            if (!Object.keys(changes).length) return;
+            const button = document.getElementById("save-btn");
+            button.disabled = true;
+            try {
+                const result = await api("/admin/settings", { method: "PUT", body: JSON.stringify(changes) });
+                const lines = [`✓ ذخیره شد: ${result.changed.join("، ") || "—"}`];
+                if (result.llm_error) lines.push(`⚠️ مدل زبانی در دسترس نیست: ${result.llm_error}`);
+                if (result.reindex === "started") lines.push("🔄 بازسازی ایندکس در پس‌زمینه شروع شد.");
+                if (result.reindex === "busy") lines.push("⚠️ یک کار دیگر در حال اجراست؛ پس از پایان آن «بازسازی ایندکس» را بزنید.");
+                showNotice("save-result", result.llm_error ? "err" : "ok", lines.join("\n"));
+                await loadSettings();
+                refreshStatus();
+            } catch (err) {
+                showNotice("save-result", "err", err.message);
+                button.disabled = false;
+            }
+        });
+
+        document.getElementById("test-llm-btn").addEventListener("click", async (e) => {
+            e.target.disabled = true;
+            showNotice("test-llm-result", "info", "در حال تست...");
+            try {
+                const result = await api("/admin/test-llm", { method: "POST" });
+                if (result.ok) showNotice("test-llm-result", "ok", `✓ اتصال برقرار است (${result.latency_ms.toLocaleString("fa-IR")} میلی‌ثانیه) — پاسخ: ${result.reply}`);
+                else showNotice("test-llm-result", "err", `✗ ${result.error}`);
+            } catch (err) {
+                showNotice("test-llm-result", "err", err.message);
+            } finally {
+                e.target.disabled = false;
+            }
+        });
+
+        // ─── Jobs ──────────────────────────────────────────────────────────
+
+        async function startJob(path, label) {
+            try {
+                await api(path, { method: "POST" });
+                showNotice("job-notice", "info", `${label} شروع شد...`);
+                refreshStatus();
+            } catch (err) {
+                showNotice("job-notice", "err", err.message);
+            }
+        }
+
+        document.getElementById("sync-btn").addEventListener("click", () => startJob("/admin/sync", "همگام‌سازی وب‌سایت"));
+        document.getElementById("reindex-btn").addEventListener("click", () => startJob("/admin/reindex", "بازسازی ایندکس"));
+
+        // ─── Feedback ──────────────────────────────────────────────────────
+
+        const FEEDBACK_PAGE = 30;
+        let feedbackRating = "";
+        let feedbackOffset = 0;
+
+        async function loadFeedback(append = false) {
+            if (!append) feedbackOffset = 0;
+            const list = document.getElementById("feedback-list");
+            try {
+                const params = new URLSearchParams({ limit: FEEDBACK_PAGE, offset: feedbackOffset });
+                if (feedbackRating) params.set("rating", feedbackRating);
+                const data = await api(`/admin/feedback?${params}`);
+                const n = v => Number(v || 0).toLocaleString("fa-IR");
+                document.getElementById("feedback-stats").textContent =
+                    `مجموع: ${n(data.stats.total)} · 👍 ${n(data.stats.up)} · 👎 ${n(data.stats.down)}`;
+
+                const html = data.items.map(item => {
+                    const kind = item.rating <= 2 ? "down" : item.rating >= 4 ? "up" : "";
+                    return `
+                        <div class="feedback-item ${kind}">
+                            <div class="feedback-meta">
+                                <span>${kind === "down" ? "👎" : kind === "up" ? "👍" : "⭐ " + escapeHtml(item.rating)}</span>
+                                <span>${formatDate(item.created_at ? item.created_at.replace(" ", "T") + "Z" : "")}</span>
+                            </div>
+                            <div class="feedback-question">${escapeHtml(item.question || "—")}</div>
+                            <details><summary>پاسخ چت‌بات</summary><div class="feedback-answer">${escapeHtml(item.answer)}</div></details>
+                            ${item.comment ? `<div class="feedback-comment">💬 ${escapeHtml(item.comment)}</div>` : ""}
+                        </div>`;
+                }).join("");
+
+                if (append) list.insertAdjacentHTML("beforeend", html);
+                else list.innerHTML = html || `<div class="empty">هنوز بازخوردی ثبت نشده است.</div>`;
+                feedbackOffset += data.items.length;
+                document.getElementById("feedback-more").style.display = feedbackOffset < data.matching ? "inline-block" : "none";
+            } catch (err) {
+                list.innerHTML = `<div class="notice show err">${escapeHtml(err.message)}</div>`;
+            }
+        }
+
+        document.querySelectorAll(".filter-bar [data-rating]").forEach(button => {
+            button.addEventListener("click", () => {
+                document.querySelectorAll(".filter-bar [data-rating]").forEach(b => b.classList.toggle("active", b === button));
+                feedbackRating = button.dataset.rating;
+                loadFeedback();
+            });
+        });
+        document.getElementById("feedback-refresh").addEventListener("click", () => loadFeedback());
+        document.getElementById("feedback-more").addEventListener("click", () => loadFeedback(true));
+
+        // ─── Status ────────────────────────────────────────────────────────
+
+        function formatDate(iso) {
+            if (!iso) return "—";
+            try { return new Date(iso).toLocaleString("fa-IR"); } catch (e) { return iso; }
+        }
+
+        function stat(label, value, sub, dot) {
+            return `<div class="stat"><div class="label">${label}</div><div class="value">${dot ? `<span class="dot ${dot}"></span>` : ""}${value}</div>${sub ? `<div class="sub">${sub}</div>` : ""}</div>`;
+        }
+
+        async function refreshStatus() {
+            clearTimeout(pollTimer);
+            let running = false;
+            try {
+                const s = await api("/admin/status");
+                const job = s.job;
+                running = job.status === "running";
+                const byType = Object.entries(s.index.sources_by_type || {})
+                    .map(([type, n]) => `${TYPE_LABELS[type] || escapeHtml(type)}: ${Number(n).toLocaleString("fa-IR")}`).join(" · ");
+                const jobDot = { running: "busy", done: "ok", error: "bad" }[job.status] || "";
+                const jobName = { sync: "همگام‌سازی وب‌سایت", reindex: "بازسازی ایندکس", startup: "بارگذاری اولیه" }[job.name] || "—";
+                document.getElementById("status-grid").innerHTML = [
+                    stat("مدل زبانی", escapeHtml(s.llm.model), s.llm.ready ? `ارائه‌دهنده: ${escapeHtml(s.llm.provider)}` : escapeHtml(s.llm.error || "پیکربندی نشده"), s.llm.ready ? "ok" : "bad"),
+                    stat("پایگاه دانش", s.index.ready ? `${Number(s.index.chunks || 0).toLocaleString("fa-IR")} بخش` : "در حال آماده‌سازی", byType || "—", s.index.ready ? "ok" : "busy"),
+                    stat("محصولات", Number(s.products).toLocaleString("fa-IR"), `آخرین همگام‌سازی سایت: ${formatDate(s.index.site_fetched_at)}`),
+                    stat("آخرین عملیات", jobName, `${escapeHtml(job.message || "")}${job.finished_at ? `<br>${formatDate(job.finished_at)}` : ""}`, jobDot),
+                ].join("");
+                document.getElementById("sync-btn").disabled = running;
+                document.getElementById("reindex-btn").disabled = running;
+                if (lastJobStatus === "running" && !running) {
+                    showNotice("job-notice", job.status === "error" ? "err" : "ok", job.message || "انجام شد.");
+                }
+                lastJobStatus = job.status;
+            } catch (err) {
+                if (!token) return;
+                document.getElementById("status-grid").innerHTML = stat("وضعیت", "خطا", escapeHtml(err.message), "bad");
+            }
+            if (token) pollTimer = setTimeout(refreshStatus, running ? 2000 : 15000);
+        }
+
+        async function start() {
+            document.getElementById("login-view").style.display = "none";
+            document.getElementById("app-view").style.display = "block";
+            try {
+                await loadSettings();
+                refreshStatus();
+                loadFeedback();
+            } catch (err) {
+                showNotice("save-result", "err", err.message);
+            }
+        }
+
+        if (token) start();
+    </script>
+</body>
+</html>

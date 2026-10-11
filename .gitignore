@@ -17,9 +17,10 @@ env/
 .env
 backend/.env
 
-# Database files
+# Database files and generated data (site snapshot, runtime settings with API keys)
 *.db
 chroma_db/
+backend/data/
 
 # IDE
 .vscode/

@@ -1,0 +1,17 @@
+.git
+.venv
+venv
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+*.log
+backend/.env
+backend/data
+backend/*.db
+backend/tests
+chroma_db
+knowledge_base
+frontend
+deploy
+docs
+ingest.ipynb
